@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Organizer - Arrange Pages</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.12.313/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.14.0/Sortable.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #ffffff;
+            --text-color: #000000;
+            --primary-color: #000000;
+            --secondary-color: #f0f0f0;
+            --accent-color: #4a4a4a;
+            --border-color: #ddd;
+            --button-bg: #000;
+            --button-text: #fff;
+        }
+
+        .dark-mode {
+            --bg-color: #1a1a1a;
+            --text-color: #ffffff;
+            --primary-color: #ffffff;
+            --secondary-color: #2d2d2d;
+            --accent-color: #a0a0a0;
+            --border-color: #444;
+            --button-bg: #fff;
+            --button-text: #000;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            line-height: 1.6;
+        }
+
+        header {
+            background-color: #fff;
+            color: var(--bg-color);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: black;
+        }
+
+        nav ul {
+            display: flex;
+            list-style: none;
+        }
+
+        nav ul li {
+            margin-left: 1.5rem;
+        }
+
+        nav ul li a {
+            color: var(--bg-color);
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .theme-toggle {
+            background: none;
+            border: 1px solid #1a1a1a;
+            color: #1a1a1a;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+        }
+
+        .upload-section {
+            border: 2px dashed var(--border-color);
+            padding: 2rem;
+            text-align: center;
+            margin-bottom: 2rem;
+            border-radius: 8px;
+        }
+
+        .upload-btn {
+            background-color: var(--primary-color);
+            color: var(--bg-color);
+            padding: 0.8rem 1.5rem;
+            border: none;
+            border-radius: 17px;
+            cursor: pointer;
+            font-size: 1rem;
+            margin-top: 1rem;
+        }
+
+        .preview-section {
+            margin-bottom: 2rem;
+            display: none;
+        }
+
+        .preview-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .section-title {
+            text-align: center;
+            margin-bottom: 40px;
+            color: #FF6B6B;
+            position: relative;
+            background-color: white;
+            border-radius: 40px;
+            padding: 11px;
+            margin: 15px auto;
+            width: 300px;
+            height: 60px;
+            max-width: 235px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .section-title:after {
+            content: '';
+            display: block;
+            width: 125px;
+            height: 5px;
+            background: linear-gradient(135deg, #FF6B6B, #fff);
+            margin: 1px auto;
+            border-radius: 4px;
+        }
+
+        .arrangement-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .arrangement-btn {
+            padding: 0.5rem 1rem;
+            background-color: var(--secondary-color);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            cursor: pointer;
+            color: var(--text-color);
+        }
+
+        .pages-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .page-thumbnail {
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            overflow: hidden;
+            position: relative;
+            cursor: grab;
+            aspect-ratio: 3/4;
+            transition: transform 0.2s;
+        }
+
+        .page-thumbnail:active {
+            cursor: grabbing;
+        }
+
+        .page-thumbnail.dragging {
+            opacity: 0.5;
+            transform: scale(0.95);
+        }
+
+        .page-thumbnail canvas {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        .page-number {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            text-align: center;
+            padding: 0.2rem;
+            font-size: 0.8rem;
+        }
+
+        .page-actions {
+            position: absolute;
+            top: 0;
+            right: 0;
+            display: flex;
+            background: rgba(0, 0, 0, 0.7);
+            border-radius: 0 0 0 4px;
+            padding: 0.2rem;
+        }
+
+        .page-action-btn {
+            background: none;
+            border: none;
+            color: white;
+            cursor: pointer;
+            padding: 0.3rem;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .controls {
+            background-color: var(--secondary-color);
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin-bottom: 2rem;
+            display: none;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+
+        .action-btn {
+            padding: 1rem 2rem;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: bold;
+        }
+
+        .organize-btn {
+            background-color: var(--primary-color);
+            color: var(--bg-color);
+        }
+
+        .download-btn {
+            background-color: #4CAF50;
+            color: white;
+        }
+
+        .another-btn {
+            background-color: var(--accent-color);
+            color: var(--bg-color);
+        }
+
+        .download-section {
+            display: none;
+            margin-top: 2rem;
+        }
+
+        footer {
+            background-color: var(--primary-color);
+            color: var(--bg-color);
+            text-align: center;
+            padding: 0.3rem;
+            margin-top: 18.7rem;
+        }
+
+        @media (max-width: 768px) {
+            .pages-container {
+                grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+            }
+            
+            nav ul {
+                display: none;
+            }
+            
+            .action-buttons {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="logo">PDF Organizer</div>
+        <button class="theme-toggle" id="themeToggle">Dark Mode</button>
+    </header>
+    <h4 class="section-title">PDF ORGANIZER</h4>
+
+    <div class="container">
+        <section class="upload-section" id="uploadSection">
+            <h2>Upload PDF to Organize</h2>
+            <p>Drag & drop your PDF file here or click to browse</p>
+            <input type="file" id="pdfFile" accept=".pdf" style="display: none;">
+            <button class="upload-btn" id="uploadBtn">Choose PDF File</button>
+        </section>
+
+        <section class="preview-section" id="previewSection">
+            <div class="preview-header">
+                <h2>Arrange PDF Pages</h2>
+                <p>Total pages: <span id="totalPages">0</span></p>
+            </div>
+            
+            <div class="arrangement-buttons">
+                <button class="arrangement-btn" id="reverseOrderBtn">Reverse Order</button>
+                <button class="arrangement-btn" id="addPdfBtn">Add More PDF</button>
+                <button class="arrangement-btn" id="resetOrderBtn">Reset to Original</button>
+            </div>
+            
+            <div class="pages-container" id="pagesContainer">
+                <!-- PDF pages will be rendered here -->
+            </div>
+        </section>
+
+        <section class="controls" id="controls">
+    <h2>Page Arrangement Settings</h2>
+    
+    <div class="control-group">
+        <label>Quick Arrangement Options:</label>
+        <div class="arrangement-buttons">
+            <div class="arrangement-btn" id="reverseOrderBtn">
+                <h4>Reverse Order</h4>
+                <p>Reverse the current page order</p>
+            </div>
+            <div class="arrangement-btn" id="resetOrderBtn">
+                <h4>Reset to Original</h4>
+                <p>Restore original page order</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="action-buttons">
+        <button class="action-btn organize-btn" id="organizeBtn">Organize PDF</button>
+        <button class="action-btn another-btn" id="anotherBtn" style="display: none;">Organize Another File</button>
+    </div>
+</section>
+
+        <section class="download-section" id="downloadSection">
+            <div class="download-header">
+                <h2>Download Organized PDF</h2>
+                <a id="downloadLink" class="action-btn download-btn" style="display: none;">Download PDF</a>
+            </div>
+        </section>
+    </div>
+
+    <footer>
+        <p>&copy; 2025 PDF Organizer Tool. All rights reserved.</p>
+    </footer>
+
+    <script>
+        // Theme toggle functionality
+        const themeToggle = document.getElementById('themeToggle');
+        themeToggle.addEventListener('click', () => {
+            document.body.classList.toggle('dark-mode');
+            if (document.body.classList.contains('dark-mode')) {
+                themeToggle.textContent = 'Light Mode';
+            } else {
+                themeToggle.textContent = 'Dark Mode';
+            }
+        });
+
+        // PDF handling
+        const pdfFileInput = document.getElementById('pdfFile');
+        const uploadBtn = document.getElementById('uploadBtn');
+        const uploadSection = document.getElementById('uploadSection');
+        const previewSection = document.getElementById('previewSection');
+        const pagesContainer = document.getElementById('pagesContainer');
+        const totalPagesElement = document.getElementById('totalPages');
+        const controls = document.getElementById('controls');
+        const organizeBtn = document.getElementById('organizeBtn');
+        const anotherBtn = document.getElementById('anotherBtn');
+        const downloadSection = document.getElementById('downloadSection');
+        const downloadLink = document.getElementById('downloadLink');
+        const reverseOrderBtn = document.getElementById('reverseOrderBtn');
+        const resetOrderBtn = document.getElementById('resetOrderBtn');
+        const addPdfBtn = document.getElementById('addPdfBtn');
+
+        // Store all PDF data
+        let pdfDocuments = [];
+        let totalPages = 0;
+        let pageOrder = [];
+        let sortable = null;
+
+        // Set up file input
+        uploadBtn.addEventListener('click', () => {
+            pdfFileInput.click();
+        });
+
+        pdfFileInput.addEventListener('change', handleFileSelect);
+
+        // Set up add PDF button
+        addPdfBtn.addEventListener('click', () => {
+            pdfFileInput.click();
+        });
+
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (file && file.type === 'application/pdf') {
+                const fileReader = new FileReader();
+                
+                fileReader.onload = function() {
+                    const arrayBuffer = this.result;
+                    
+                    // Initialize PDF.js
+                    const typedarray = new Uint8Array(arrayBuffer);
+                    pdfjsLib.getDocument(typedarray).promise.then(pdf => {
+                        const pdfNumPages = pdf.numPages;
+                        const startIndex = totalPages;
+                        
+                        // Store PDF document and its metadata
+                        pdfDocuments.push({
+                            pdf: pdf,
+                            arrayBuffer: arrayBuffer,
+                            startIndex: startIndex,
+                            pageCount: pdfNumPages
+                        });
+                        
+                        // Update total pages
+                        totalPages += pdfNumPages;
+                        totalPagesElement.textContent = totalPages;
+                        
+                        // Add new pages to the order
+                        for (let i = 0; i < pdfNumPages; i++) {
+                            pageOrder.push(startIndex + i);
+                        }
+                        
+                        // Show preview section and controls
+                        uploadSection.style.display = 'none';
+                        previewSection.style.display = 'block';
+                        controls.style.display = 'block';
+                        downloadSection.style.display = 'none';
+                        
+                        // Render all pages
+                        renderAllPages();
+                        
+                        // Initialize drag and drop
+                        initSortable();
+                    }).catch(error => {
+                        console.error('Error loading PDF:', error);
+                        alert('Error loading PDF. Please try again with a valid PDF file.');
+                    });
+                };
+                
+                fileReader.readAsArrayBuffer(file);
+            } else {
+                alert('Please select a valid PDF file.');
+            }
+        }
+
+        function renderAllPages() {
+            pagesContainer.innerHTML = '';
+            
+            for (let i = 0; i < totalPages; i++) {
+                const pageIndex = pageOrder[i];
+                const pageThumbnail = document.createElement('div');
+                pageThumbnail.className = 'page-thumbnail';
+                pageThumbnail.setAttribute('data-page', pageIndex);
+                pagesContainer.appendChild(pageThumbnail);
+                
+                // Create page actions
+                const pageActions = document.createElement('div');
+                pageActions.className = 'page-actions';
+                
+                const removeBtn = document.createElement('button');
+                removeBtn.className = 'page-action-btn';
+                removeBtn.innerHTML = '×';
+                removeBtn.title = 'Remove Page';
+                removeBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    removePage(pageIndex);
+                });
+                
+                pageActions.appendChild(removeBtn);
+                pageThumbnail.appendChild(pageActions);
+                
+                // Find which PDF this page belongs to
+                const pdfInfo = findPdfForPage(pageIndex);
+                if (!pdfInfo) continue;
+                
+                const { pdf, localPageIndex } = pdfInfo;
+                
+                // Get page
+                pdf.getPage(localPageIndex + 1).then(page => {
+                    const viewport = page.getViewport({ scale: 0.5 });
+                    
+                    const canvas = document.createElement('canvas');
+                    canvas.height = viewport.height;
+                    canvas.width = viewport.width;
+                    
+                    const context = canvas.getContext('2d');
+                    
+                    const renderContext = {
+                        canvasContext: context,
+                        viewport: viewport
+                    };
+                    
+                    page.render(renderContext).promise.then(() => {
+                        pageThumbnail.appendChild(canvas);
+                        
+                        const pageNumber = document.createElement('div');
+                        pageNumber.className = 'page-number';
+                        pageNumber.textContent = `Page ${pageIndex + 1}`;
+                        pageThumbnail.appendChild(pageNumber);
+                    });
+                }).catch(error => {
+                    console.error('Error rendering page:', error);
+                });
+            }
+        }
+
+        function findPdfForPage(pageIndex) {
+            for (const pdfDoc of pdfDocuments) {
+                if (pageIndex >= pdfDoc.startIndex && pageIndex < pdfDoc.startIndex + pdfDoc.pageCount) {
+                    return {
+                        pdf: pdfDoc.pdf,
+                        arrayBuffer: pdfDoc.arrayBuffer,
+                        localPageIndex: pageIndex - pdfDoc.startIndex
+                    };
+                }
+            }
+            return null;
+        }
+
+        function removePage(pageIndex) {
+            // Remove the page from the order
+            const indexInOrder = pageOrder.indexOf(pageIndex);
+            if (indexInOrder !== -1) {
+                pageOrder.splice(indexInOrder, 1);
+                totalPages--;
+                totalPagesElement.textContent = totalPages;
+                
+                // Re-render the pages
+                renderAllPages();
+                initSortable();
+            }
+        }
+
+        function initSortable() {
+            if (sortable) {
+                sortable.destroy();
+            }
+            
+            sortable = new Sortable(pagesContainer, {
+                animation: 150,
+                ghostClass: 'dragging',
+                onEnd: function(evt) {
+                    // Update page order based on new positions
+                    const newPageOrder = [];
+                    const pageElements = pagesContainer.querySelectorAll('.page-thumbnail');
+                    
+                    pageElements.forEach(element => {
+                        newPageOrder.push(parseInt(element.getAttribute('data-page')));
+                    });
+                    
+                    pageOrder = newPageOrder;
+                }
+            });
+        }
+
+        // Reverse order functionality
+        reverseOrderBtn.addEventListener('click', () => {
+            pageOrder.reverse();
+            renderAllPages();
+            initSortable();
+        });
+
+        // Reset order functionality
+        resetOrderBtn.addEventListener('click', () => {
+            // Reset to original order
+            pageOrder = [];
+            pdfDocuments.forEach((pdfDoc, index) => {
+                for (let i = 0; i < pdfDoc.pageCount; i++) {
+                    pageOrder.push(pdfDoc.startIndex + i);
+                }
+            });
+            renderAllPages();
+            initSortable();
+        });
+
+        // Organize PDF functionality
+        organizeBtn.addEventListener('click', organizePdf);
+        anotherBtn.addEventListener('click', resetTool);
+
+        async function organizePdf() {
+            if (pdfDocuments.length === 0) {
+                alert('Please upload a PDF first.');
+                return;
+            }
+            
+            organizeBtn.textContent = 'Organizing...';
+            organizeBtn.disabled = true;
+            
+            try {
+                // Create a new PDF document
+                const { PDFDocument } = PDFLib;
+                const newPdfDoc = await PDFDocument.create();
+                
+                // Add pages in the specified order
+                for (let i = 0; i < pageOrder.length; i++) {
+                    const pageIndex = pageOrder[i];
+                    
+                    // Find which PDF this page belongs to
+                    const pdfInfo = findPdfForPage(pageIndex);
+                    if (!pdfInfo) continue;
+                    
+                    const { arrayBuffer, localPageIndex } = pdfInfo;
+                    
+                    // Load the source PDF
+                    const sourcePdf = await PDFDocument.load(arrayBuffer);
+                    
+                    // Copy the page
+                    const [originalPage] = await newPdfDoc.copyPages(sourcePdf, [localPageIndex]);
+                    newPdfDoc.addPage(originalPage);
+                }
+                
+                // Save the PDF
+                const pdfBytes = await newPdfDoc.save();
+                
+                // Create download link
+                const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+                const url = URL.createObjectURL(blob);
+                
+                downloadLink.href = url;
+                downloadLink.download = 'organized-document.pdf';
+                downloadLink.style.display = 'block';
+                
+                // Show download section
+                downloadSection.style.display = 'block';
+                anotherBtn.style.display = 'block';
+                
+            } catch (error) {
+                console.error('Error organizing PDF:', error);
+                alert('Error organizing PDF. Please try again. Details: ' + error.message);
+            }
+            
+            organizeBtn.textContent = 'Organize PDF';
+            organizeBtn.disabled = false;
+        }
+
+        function resetTool() {
+            uploadSection.style.display = 'block';
+            previewSection.style.display = 'none';
+            controls.style.display = 'none';
+            downloadSection.style.display = 'none';
+            anotherBtn.style.display = 'none';
+            pdfFileInput.value = '';
+            pdfDocuments = [];
+            pageOrder = [];
+            totalPages = 0;
+            totalPagesElement.textContent = '0';
+            
+            if (sortable) {
+                sortable.destroy();
+                sortable = null;
+            }
+        }
+
+        // Handle drag and drop
+        uploadSection.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadSection.style.borderColor = '#000';
+        });
+        
+        uploadSection.addEventListener('dragleave', () => {
+            uploadSection.style.borderColor = 'var(--border-color)';
+        });
+        
+        uploadSection.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadSection.style.borderColor = 'var(--border-color)';
+            
+            if (e.dataTransfer.files.length) {
+                pdfFileInput.files = e.dataTransfer.files;
+                handleFileSelect({ target: { files: e.dataTransfer.files } });
+            }
+        });
+    </script>
+</body>
+</html>
